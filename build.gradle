@@ -1,0 +1,55 @@
+buildscript {
+    repositories {
+        jcenter()
+    }
+}
+
+plugins {
+    id 'java'
+    id 'application'
+}
+
+ext {
+    group = "yourArtefactGroup"
+}
+
+repositories {
+    jcenter()
+}
+
+project.targetCompatibility = JavaVersion.VERSION_1_8
+project.sourceCompatibility = JavaVersion.VERSION_1_8
+
+dependencies {
+    implementation "your:dependency:0.10.1"
+    implementation "info.picocli:picocli:3.9.6"
+}
+
+application {
+    mainClassName = 'your.path.to.mainJavaClass'
+}
+
+jar {
+    manifest {
+        attributes "Main-Class": application.mainClassName
+    }
+ 
+    from {
+        // configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+        // filters only existing and non-empty dirs
+        sourceSets.main.runtimeClasspath
+            .filter {  (it.isDirectory() && it.listFiles().length > 0) || it.isFile() }
+            .collect { it.isDirectory() ? it : zipTree(it) }
+
+    }
+}
+
+task printClasspath(group:project.rootProject.ext.group, description:"print classpath") {
+    dependsOn subprojects.build
+    doLast {
+        // filters only existing and non-empty dirs
+        sourceSets.main.runtimeClasspath
+            .filter { (it.isDirectory() && it.listFiles().length > 0) || it.isFile() }
+            .each{ println it }
+    }
+}
