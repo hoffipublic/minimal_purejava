@@ -1,12 +1,16 @@
 import groovy.json.JsonSlurper
+import org.gradle.internal.logging.text.StyledTextOutput 
+import org.gradle.internal.logging.text.StyledTextOutputFactory
+import org.gradle.internal.logging.text.StyledTextOutput.Style
 
 buildscript {
     ext {
         versions = new JsonSlurper().parseFile(rootProject.file('dependencies.json'), 'UTF-8')
-        v = {  x -> versions.latest.default[x] }
+        v = {  x -> versions.latest.default[x] } // helper function to acces slurped linked dependencies.json latest versions
+        vp = { x -> versions.latest.plugin[x] } // helper function to acces slurped linked dependencies.json latest versions for gradle plugins
     }
-
     repositories {
+        mavenLocal()
         jcenter()
     }
 }
@@ -14,11 +18,15 @@ buildscript {
 plugins {
     id 'java'
     id 'application'
+    id 'maven-publish'
 }
 
 ext {
     group = "yourArtefactGroup"
+    version = '0.1.0.SNAPSHOT'
 }
+group = project.ext.group // for publishing
+version = project.ext.version
 
 repositories {
     jcenter()
@@ -26,6 +34,7 @@ repositories {
 
 project.targetCompatibility = JavaVersion.VERSION_1_8
 project.sourceCompatibility = JavaVersion.VERSION_1_8
+def out = services.get(StyledTextOutputFactory).create("an-ouput")
 
 application {
     mainClassName = 'your.path.to.mainJavaClass'
@@ -34,7 +43,7 @@ application {
 dependencies {
     compile "ch.qos.logback:logback-classic:${v('logbackVersion')}"
     implementation "info.picocli:picocli:${v('picocliVersion')}"
-    implementation "your:dependency:0.10.1"
+    // implementation "your:dependency:0.10.1"
 
     testImplementation "org.junit.jupiter:junit-jupiter-api:${versions.latest.default['junitJupiterVersion']}"
     testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:${versions.latest.default['junitJupiterVersion']}"
@@ -42,14 +51,33 @@ dependencies {
 
 test {
     useJUnitPlatform()
+    failFast = false
     testLogging.showStandardStreams = true
     testLogging {
         events "PASSED", "FAILED", "SKIPPED" //, "STARTED"
     }
+
+    beforeTest { descriptor ->
+        logger.lifecycle("Running test: " + descriptor)
+    }
+    // listen to standard out and standard error of the test JVM(s)
+    onOutput { descriptor, event ->
+        // logger.lifecycle("Test: " + descriptor + " produced standard out/err: " + event.message )
+        event.message
+    }
+    afterSuite { desc, result ->
+        if (!desc.parent) { // will match the outermost suite
+            if (result.failedTestCount <= 0) {
+                out.style(Style.Success).println "\nTest Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} successes, ${result.failedTestCount} failures, ${result.skippedTestCount} skipped)"
+            } else {
+                out.style(Style.Failure).println "\nTest Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} successes, ${result.failedTestCount} failures, ${result.skippedTestCount} skipped)"
+            }
+        }
+    }
 }
 
-
 jar {
+    //from sourceSets.main.allSource // adds source .java files to fat jar
     manifest {
         attributes "Main-Class": application.mainClassName
     }
@@ -63,6 +91,24 @@ jar {
 
     }
 }
+
+task sourcesJar(group: build, type: Jar, dependsOn: classes) {
+    // from sourceSets.main.allJava
+    // from sourceSets.main.delombokTask
+    from sourceSets.main.allSource
+    classifier = 'sources'
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            artifact sourcesJar
+            // artifact javadocJar
+        }
+    }
+}
+
 
 task printClasspath(group:project.rootProject.ext.group, description:"print classpath") {
     dependsOn subprojects.build
