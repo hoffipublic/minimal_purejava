@@ -32,8 +32,8 @@ repositories {
     jcenter()
 }
 
-project.targetCompatibility = JavaVersion.VERSION_1_8
-project.sourceCompatibility = JavaVersion.VERSION_1_8
+project.targetCompatibility = JavaVersion.VERSION_11
+project.sourceCompatibility = JavaVersion.VERSION_11
 def out = services.get(StyledTextOutputFactory).create("an-ouput")
 
 application {
@@ -41,7 +41,7 @@ application {
 }
 
 dependencies {
-    compile "ch.qos.logback:logback-classic:${v('logbackVersion')}"
+    implementation "ch.qos.logback:logback-classic:${v('logbackVersion')}"
     implementation "info.picocli:picocli:${v('picocliVersion')}"
     // implementation "your:dependency:0.10.1"
 
